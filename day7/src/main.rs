@@ -33,7 +33,7 @@ impl HandType {
           4 => Self::FullHouse,
           5 => Self::FourOfAKind,
           6 => Self::FiveOfAKind,
-          _ => Self::HighCard
+          _ => Self::FiveOfAKind
       }
     }
 }
@@ -152,53 +152,63 @@ impl Hand {
     fn change_type_j(mut self) -> Self {
       let cards = &self.cards;
       let number_of_js = cards.into_iter().filter(|x| x.label == 'J').count() as i32;
+
+      if number_of_js == 0 {
+        return self.change_type();
+      }
+
+      if number_of_js == 5 {
+        self.hand_type = HandType::FiveOfAKind;
+        return self
+      }
+
       let mut map: HashMap<char,i32> = HashMap::new();
 
-      let mut value = 0;
-
       for card in cards {
+        if card.label == 'J' {
+          continue
+        }
         map.entry(card.label).and_modify(|x| *x += 1).or_insert(1);
       }
 
-      if map.len() == 1 {
-        // Unchanged ✅
-        self.hand_type = HandType::FiveOfAKind;
-        return self;
-      }
-
-      if map.len() == 5 {
-        value = 0;
-        self.hand_type = HandType::get_type(value + number_of_js);
-
-      }
-
       if map.len() == 4 {
-        value = 1;
-        self.hand_type = HandType::get_type(value + number_of_js);
+        self.hand_type = HandType::OnePair;
       }
 
       if map.len() == 3 {
-        for (_, n) in &map {
-          if *n == 2 {
-            value = 2;
-            self.hand_type = HandType::get_type(value + number_of_js);
-            return self
+        match number_of_js {
+            1 => {
+              if map.values().any(|x| *x == 2) {
+                self.hand_type = HandType::ThreeOfAKind;
+              } else {
+                self.hand_type = HandType::TwoPair;
+              }
+            },
+            2 => self.hand_type = HandType::ThreeOfAKind,
+            _ => {}
 
-          }
         }
-
-        self.hand_type = HandType::get_type(3 + number_of_js);
       }
 
       if map.len() == 2 {
-        for (_, n) in &map {
-          if *n == 4 {
-            self.hand_type = HandType::get_type(value + number_of_js);
-            return self;
-          }
+        match number_of_js {
+            1 => {
+              if map.values().any(|x| *x == 3) {
+                self.hand_type = HandType::FourOfAKind;
+              } else {
+                self.hand_type = HandType::FullHouse;
+              }
+            },
+            2 => self.hand_type = HandType::FourOfAKind,
+            3 => self.hand_type = HandType::FourOfAKind,
+            _ => {}
         }
-        self.hand_type = HandType::get_type(5 + number_of_js);
       }
+
+      if map.len() == 1 {
+        self.hand_type = HandType::FiveOfAKind;
+      }
+
       return self
     }
 }
@@ -243,7 +253,7 @@ fn part_1() -> i32 {
 
       let bid: i32 = line.split_whitespace().nth(1).unwrap().parse().unwrap();
 
-      hand = hand.change_type();
+      //hand = hand.change_type();
       hand.bid = bid;
 
       hands.push(hand);
@@ -285,14 +295,14 @@ fn part_1() -> i32 {
 
 
 fn part_2() -> i32 {
-  let input = read_test();
+  let input = read_input();
     let mut hands: Vec<Hand> = vec![];
 
     for line in input.lines() {
       let mut hand = Hand::new();
       let card = line.split_whitespace().nth(0).unwrap();
       for c in card.chars() {
-        hand.cards.push(Card { label: c });
+        hand.cards.push(Card::new(c));
       }
 
       let bid: i32 = line.split_whitespace().nth(1).unwrap().parse().unwrap();
@@ -329,7 +339,13 @@ fn part_2() -> i32 {
     });
 
     for hand in &hands {
-      println!("{:?}", hand);
+      for card in &hand.cards {
+        if card.label == 'J' {
+          let cards_str = hand.cards.iter().map(|x| x.label).collect::<String>();
+          let hand_type = &hand.hand_type;
+          println!("{:?} - {:?}", cards_str, hand_type);
+        }
+      }
     }
 
     hands.into_iter().enumerate().fold(0, |acc, (idx, hand) | {
